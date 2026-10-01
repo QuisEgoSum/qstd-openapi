@@ -1,0 +1,72 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  BASE: >-
+    --with pytest>=8,<9
+    --with typing_extensions>=4.7
+    --with openapi-spec-validator>=0.7
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --extra dev
+      - run: uv run ruff check src tests examples
+      - run: uv run black --check src tests examples
+      - run: uv run mypy src tests
+      - run: uv run pyright
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "3.9", python: "3.9", extras: all }
+          - { name: "3.10", python: "3.10", extras: all }
+          - { name: "3.11", python: "3.11", extras: all }
+          - { name: "3.12", python: "3.12", extras: all }
+          - { name: "3.13", python: "3.13", extras: all }
+          - { name: "lower bounds", python: "3.9", extras: lower }
+          - { name: "pydantic 1", python: "3.9", extras: pydantic-v1 }
+          - { name: "no pydantic", python: "3.9", extras: none }
+    name: tests (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Run tests
+        env:
+          ALL: >-
+            --with pydantic>=2.6,<3 --with PyYAML>=6
+            --with sanic>=23.12 --with sanic-testing>=23.12
+            --with fastapi>=0.110 --with httpx>=0.24
+          LOWER: >-
+            --with pydantic==2.6.* --with PyYAML==6.0.*
+            --with sanic==23.12.* --with sanic-testing==23.12.*
+            --with fastapi==0.110.* --with httpx>=0.24
+          V1: --with pydantic>=1.10,<2
+        run: |
+          set -f  # the --with lists contain "*" (pydantic==2.6.*): no globbing
+          case "${{ matrix.extras }}" in
+            all) EXTRA="$ALL" ;;
+            lower) EXTRA="$LOWER" ;;
+            pydantic-v1) EXTRA="$V1" ;;
+            *) EXTRA="" ;;
+          esac
+          # Word splitting of the --with lists is intended.
+          # shellcheck disable=SC2086
+          uv run --isolated --no-project --python "${{ matrix.python }}" \
+            $BASE $EXTRA python -m pytest -q -p no:cacheprovider

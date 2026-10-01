@@ -1,0 +1,183 @@
+# Describing operations
+
+Every decorator in `qstd_openapi.openapi` returns the decorated object
+unchanged. Decorators may be stacked in any order, and several layers may
+contribute to the same handler.
+
+## Single-purpose decorators
+
+| Decorator | Purpose |
+|---|---|
+| `tag(*names)` | Add operation tags |
+| `summary(text)`, `description(text)` | Set human-readable operation text |
+| `operation_id(value)` | Override the generated `operationId` |
+| `deprecated()`, `exclude()` | Mark or omit an operation |
+| `body(schema)`, `body_one_of(*schemas)` | Describe a request body |
+| `body_binary()`, `body_form_data_file()`, `body_form_data_files()` | Describe file uploads |
+| `query(...)`, `path(...)`, `header(...)`, `cookie(...)` | Add one parameter or expand a model |
+| `response(...)`, `responses(...)`, `no_content()` | Add a response |
+| `response_file()`, `response_header()` | Describe file responses and headers |
+| `errors(*classes)` | Add responses through an error provider |
+| `security(...)` | Add one alternative security requirement |
+| `scope(*labels)` | Label an operation for document filtering |
+| `webhook(name)` | Mark a function that sends a webhook |
+| `extra(fields)` | Deep-merge raw operation fields last |
+
+For example:
+
+```python
+@openapi.tag('Users')
+@openapi.errors(UserAlreadyExistsError)
+@openapi.response(UserDTO, status=201)
+@openapi.body(UserRegisterInput)
+async def register_user(request):
+    """Register a user.
+
+    Sends a confirmation email.
+    """
+```
+
+## One `describe()` call
+
+`describe()` accepts the same concepts in one typed call:
+
+```python
+@openapi.describe(
+    tags=['Users'],
+    body=UserRegisterInput,
+    responses={201: UserDTO, 202: None},
+    errors=[UserAlreadyExistsError, WeakPasswordError],
+    security='UserSession',
+    summary='Register a user',
+)
+async def register_user(request):
+    ...
+```
+
+`None` as a response value means that the status has no response body. A list
+of schemas for one status becomes `oneOf`.
+
+The options are defined by the `DescribeOptions` `TypedDict`. Mypy, pyright
+and compatible editors report misspelled names and incorrect value types.
+
+## Parameters
+
+Pass a name and a schema to describe one parameter:
+
+```python
+@openapi.query('page', int, required=False, description='Page number')
+@openapi.header('X-Request-ID', str)
+async def list_users(request):
+    ...
+```
+
+Pass a model to expand its fields into separate parameters:
+
+```python
+class UserQuery(BaseModel):
+    page: int = Field(1, ge=1)
+    size: int = Field(20, ge=1, le=100)
+
+
+@openapi.query(UserQuery)
+async def list_users(request):
+    ...
+```
+
+Sanic path parameters are derived from the route template. An explicit
+`openapi.path()` contribution can add a description or override the inferred
+schema.
+
+## Named examples
+
+Examples belong to a request media type, response media type or individual
+parameter:
+
+```python
+@openapi.body(
+    UserRegisterInput,
+    examples={
+        'standard': {
+            'email': 'user@example.com',
+            'password': 'example-passphrase',
+        },
+    },
+)
+@openapi.response(
+    UserDTO,
+    status=201,
+    examples={
+        'created': openapi.Example(
+            {'id': 1, 'email': 'user@example.com'},
+            summary='A newly registered user',
+        ),
+    },
+)
+@openapi.query('invite', str, examples={'code': 'INVITE-123'})
+async def register_user(request):
+    ...
+```
+
+With `describe()`, use `body_examples={...}` and
+`response_examples={201: {...}}`.
+
+## Security alternatives
+
+Each call to `security()` adds an alternative OpenAPI security requirement:
+
+```python
+@openapi.security('UserSession')
+@openapi.security({'OAuth': ['profile:read'], 'Device': []})
+async def get_profile(request):
+    ...
+```
+
+In this example the request may use `UserSession`, or it may use both `OAuth`
+and `Device`. Names must exist in `OpenAPI(security_schemes=...)`; otherwise
+the build fails.
+
+## Metadata from project decorators
+
+Use `attach()` inside decorators, middleware or validators:
+
+```python
+def validate_registration(func):
+    @functools.wraps(func)
+    async def wrapper(request, *args, **kwargs):
+        body = UserRegisterInput.model_validate(request.json)
+        return await func(request, body, *args, **kwargs)
+
+    return openapi.attach(wrapper, body=UserRegisterInput)
+```
+
+Always preserve `__wrapped__` with `functools.wraps()` or
+`functools.update_wrapper()`. A wrapper without it hides contributions attached
+to the inner function.
+
+## Generated `operationId` values
+
+By default, an operation uses the route name when its source provides one,
+and otherwise the handler function name. One handler registered for several
+methods receives a method suffix. A duplicate generated ID fails the build.
+
+An explicit `operation_id()` always wins. Configure the fallback with:
+
+```python
+OpenAPI(
+    info=...,
+    operation_ids='function',  # 'route_name', callable or None
+)
+```
+
+FastAPI keeps the IDs generated by FastAPI itself.
+
+## Merge rules
+
+Collections such as tags, errors, parameters and security requirements
+accumulate. Repeated equal values are removed.
+
+A scalar such as `summary` or `operation_id` may be set more than once only
+when the values are equal. A disagreement raises `ScalarConflictError` and
+names the sources. Set `scalar_conflicts='last_wins'` on `OpenAPI` only when
+the project deliberately wants the outermost contribution to override the
+others.

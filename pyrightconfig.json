@@ -1,0 +1,17 @@
+{
+  "include": ["src", "tests", "examples"],
+  "pythonVersion": "3.9",
+  "exclude": ["build", "dist", ".venv"],
+  "executionEnvironments": [
+    {
+      "root": "./src",
+      "extraPaths": ["./src"]
+    }
+  ],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": true,
+  "reportOptionalMemberAccess": true,
+  "typeCheckingMode": "strict",
+  "venvPath": ".",
+  "venv": ".venv"
+}

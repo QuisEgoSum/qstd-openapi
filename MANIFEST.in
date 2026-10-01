@@ -1,0 +1,4 @@
+global-exclude tests/*
+global-exclude examples/*
+include CHANGELOG.md
+recursive-include docs *.md
