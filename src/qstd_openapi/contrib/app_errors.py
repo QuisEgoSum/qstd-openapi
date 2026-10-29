@@ -28,7 +28,7 @@ from typing import (
     get_type_hints,
 )
 
-from qstd_openapi._compat import is_class
+from qstd_openapi._compat import is_class, own_annotations
 from qstd_openapi.core.error_responses import ErrorResponse
 from qstd_openapi.core.schemas import JsonSchema
 from qstd_openapi.errors import ErrorAnnotationError
@@ -153,7 +153,7 @@ class AppErrors:
         skip = {self._code_field, self._message_field, self._name_field, 'status_code'}
         names: list[str] = []
         for klass in reversed(error.__mro__):
-            for name in vars(klass).get('__annotations__', {}):
+            for name in own_annotations(klass):
                 if not name.startswith('_') and name not in skip and name not in names:
                     names.append(name)
         if not names:

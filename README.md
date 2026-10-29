@@ -51,7 +51,7 @@ Other extras:
 | `yaml` | YAML input and output |
 | `all` | Every extra except `pydantic-v1` |
 
-Python 3.9–3.13 is supported. The base package depends only on
+Python 3.9–3.15 is supported. The base package depends only on
 `typing_extensions`.
 
 ## Quick start with Sanic

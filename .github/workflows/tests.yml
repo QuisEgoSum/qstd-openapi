@@ -40,6 +40,8 @@ jobs:
           - { name: "3.11", python: "3.11", extras: all }
           - { name: "3.12", python: "3.12", extras: all }
           - { name: "3.13", python: "3.13", extras: all }
+          - { name: "3.14", python: "3.14", extras: all }
+          - { name: "3.15", python: "3.15", extras: all }
           - { name: "lower bounds", python: "3.9", extras: lower }
           - { name: "pydantic 1", python: "3.9", extras: pydantic-v1 }
           - { name: "no pydantic", python: "3.9", extras: none }
