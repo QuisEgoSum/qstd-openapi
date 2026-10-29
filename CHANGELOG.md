@@ -9,6 +9,20 @@ listed here.
 
 ---
 
+## [0.1.1] - 2026-10-29
+
+### Added
+
+- Python 3.14 and 3.15 are supported and tested.
+
+### Fixed
+
+- `AppErrors`: on Python 3.14+ payload fields of error classes declared
+  without `from __future__ import annotations` were silently missing from
+  error schemas (lazy annotations, PEP 649).
+
+---
+
 ## [0.1.0] - 2026-10-01
 
 First public release.
